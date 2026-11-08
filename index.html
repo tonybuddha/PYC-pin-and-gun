@@ -1,0 +1,687 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}body{margin:0}[hidden]{display:none!important}</style></head><body>
+<title>Pin &amp; Gun</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:wght@400;700&family=Saira+Condensed:wght@600;700&family=JetBrains+Mono:wght@400;600&display=swap">
+<style>
+/* Layout: one narrow column built for a phone in a cockpit; tabs for Course / Race / Results; huge numerals on the Race tab. */
+:root{
+  --bg:#e9eef1; --surface:#fbfcfd; --ink:#0e2130; --muted:#566977; --rule:#c9d3da;
+  --navy:#16395c; --navy-ink:#ffffff; --flag:#f2b01e; --flag-ink:#3a2a00;
+  --red:#c2321c; --green:#1d7647; --chart:#d7e3ea; --track:#16395c;
+  --display:"Saira Condensed","Arial Narrow",system-ui,sans-serif;
+  --body:"Atkinson Hyperlegible",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --mono:"JetBrains Mono",ui-monospace,Menlo,Consolas,monospace;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#0a1319; --surface:#111e27; --ink:#e3ecf2; --muted:#8ea1ae; --rule:#24353f;
+  --navy:#3f80c4; --navy-ink:#ffffff; --flag:#f2b01e; --flag-ink:#2b1f00;
+  --red:#ff6b52; --green:#4cc58a; --chart:#14242f; --track:#7fb3e6; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#0a1319; --surface:#111e27; --ink:#e3ecf2; --muted:#8ea1ae; --rule:#24353f;
+  --navy:#3f80c4; --navy-ink:#ffffff; --flag:#f2b01e; --flag-ink:#2b1f00;
+  --red:#ff6b52; --green:#4cc58a; --chart:#14242f; --track:#7fb3e6; color-scheme:dark}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--ink);font-family:var(--body);font-size:16px;line-height:1.45}
+.wrap{max-width:560px;margin:0 auto;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:12px 40px;display:flex;flex-direction:column;gap:14px}
+header{display:flex;align-items:baseline;justify-content:space-between;gap:12px;flex-wrap:wrap}
+h1{font-family:var(--display);font-weight:700;font-size:2rem;letter-spacing:.02em;margin:0;line-height:1}
+h1 span{color:var(--flag);-webkit-text-stroke:0}
+.sub{color:var(--muted);font-size:.85rem}
+nav{display:grid;grid-template-columns:repeat(3,1fr);border:1px solid var(--rule);border-radius:10px;overflow:hidden;position:sticky;top:env(safe-area-inset-top,0px);z-index:5;background:var(--surface)}
+body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset-top,0px);z-index:10;background:var(--bg)}
+nav button{all:unset;text-align:center;padding:12px 4px;font-weight:700;cursor:pointer;color:var(--muted);font-size:.95rem}
+nav button[aria-selected="true"]{background:var(--navy);color:var(--navy-ink)}
+nav button:focus-visible{outline:3px solid var(--flag);outline-offset:-3px}
+section.panel{display:flex;flex-direction:column;gap:14px}
+.card{background:var(--surface);border:1px solid var(--rule);border-radius:12px;padding:14px;display:flex;flex-direction:column;gap:10px;min-width:0}
+.card h2{font-family:var(--display);font-weight:600;font-size:1.25rem;margin:0;letter-spacing:.03em;text-transform:uppercase}
+.card h3{margin:0;font-size:.8rem;text-transform:uppercase;letter-spacing:.08em;color:var(--muted)}
+label{display:flex;flex-direction:column;gap:4px;font-size:.8rem;color:var(--muted);min-width:0}
+input,select,textarea{font:inherit;color:var(--ink);background:var(--bg);border:1px solid var(--rule);border-radius:8px;padding:9px 10px;min-width:0;width:100%}
+textarea{font-family:var(--mono);font-size:.75rem;min-height:90px;resize:vertical}
+input:focus-visible,select:focus-visible,textarea:focus-visible{outline:2px solid var(--navy);outline-offset:1px}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end}
+.row>*{flex:1 1 120px}
+.btn{all:unset;box-sizing:border-box;text-align:center;padding:11px 14px;border-radius:9px;font-weight:700;cursor:pointer;background:var(--navy);color:var(--navy-ink);flex:0 0 auto}
+.btn.ghost{background:transparent;color:var(--ink);border:1px solid var(--rule)}
+.btn.flag{background:var(--flag);color:var(--flag-ink)}
+.btn.small{padding:7px 10px;font-size:.85rem}
+.btn:focus-visible{outline:3px solid var(--flag);outline-offset:2px}
+.btn[disabled]{opacity:.45;pointer-events:none}
+.ends{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+@media (max-width:460px){.ends{grid-template-columns:1fr}}
+.end{border:1px dashed var(--rule);border-radius:10px;padding:10px;display:flex;flex-direction:column;gap:8px;min-width:0}
+.end .pos{font-family:var(--mono);font-size:.78rem}
+.pins{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:4px;font-size:.78rem}
+.pins li{display:flex;justify-content:space-between;gap:6px;align-items:center;font-family:var(--mono)}
+.pins li.far{color:var(--red)}
+.pins button{all:unset;cursor:pointer;color:var(--muted);padding:0 4px}
+.pins button:focus-visible{outline:2px solid var(--flag)}
+.meta{font-size:.8rem;color:var(--muted)}
+.mono{font-family:var(--mono)}
+details summary{cursor:pointer;font-size:.85rem;font-weight:700;color:var(--navy)}
+details[open] summary{margin-bottom:8px}
+/* race display */
+.clock{font-family:var(--display);font-weight:700;font-size:clamp(4.5rem,24vw,8rem);line-height:.9;text-align:center;font-variant-numeric:tabular-nums;letter-spacing:.01em}
+.phase{text-align:center;font-weight:700;letter-spacing:.12em;text-transform:uppercase;font-size:.8rem;color:var(--muted)}
+.banner{border-radius:10px;padding:10px 12px;font-weight:700;text-align:center}
+.banner.red{background:var(--red);color:#fff}
+.banner.green{background:var(--green);color:#fff}
+.banner.flag{background:var(--flag);color:var(--flag-ink)}
+.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.stat{display:flex;flex-direction:column;gap:2px;border-top:2px solid var(--rule);padding-top:6px}
+.stat b{font-family:var(--display);font-size:1.9rem;line-height:1;font-variant-numeric:tabular-nums}
+.stat span{font-size:.72rem;text-transform:uppercase;letter-spacing:.08em;color:var(--muted)}
+canvas{width:100%;height:280px;border-radius:10px;background:var(--chart);display:block}
+.status{font-size:.8rem;color:var(--muted);display:flex;gap:10px;flex-wrap:wrap}
+.dot{display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--muted);margin-right:5px;vertical-align:middle}
+.dot.on{background:var(--green)}
+.tablewrap{overflow-x:auto}
+table{border-collapse:collapse;width:100%;font-size:.85rem;font-variant-numeric:tabular-nums}
+th,td{text-align:left;padding:7px 6px;border-bottom:1px solid var(--rule);white-space:nowrap}
+th{font-size:.7rem;text-transform:uppercase;letter-spacing:.07em;color:var(--muted)}
+td.num,th.num{text-align:right}
+tr.ocs td{color:var(--red)}
+.toast{position:fixed;left:50%;bottom:calc(16px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:10px 16px;border-radius:999px;font-weight:700;font-size:.9rem;z-index:20;max-width:calc(100% - 32px)}
+@media (prefers-reduced-motion:no-preference){.banner.red{animation:pulse 1s ease-in-out infinite alternate}@keyframes pulse{to{opacity:.75}}}
+</style>
+
+<div class="wrap">
+  <header>
+    <h1>Pin <span>&amp;</span> Gun</h1>
+    <div class="sub">Self-timed starts and finishes. No committee boat.</div>
+  </header>
+
+  <nav role="tablist">
+    <button role="tab" id="tab-course" aria-selected="true" data-tab="course">Course</button>
+    <button role="tab" id="tab-race" aria-selected="false" data-tab="race">Race</button>
+    <button role="tab" id="tab-results" aria-selected="false" data-tab="results">Results</button>
+  </nav>
+
+  <!-- COURSE -->
+  <section class="panel" id="p-course">
+    <div class="card">
+      <h2>Race</h2>
+      <label>Race name<input id="race-name"></label>
+      <div class="row">
+        <label>Start signal<input id="race-start" type="datetime-local" step="1"></label>
+        <button class="btn ghost small" id="start-plus10">Start in 10 min</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Your boat</h2>
+      <div class="row">
+        <label>Boat name<input id="boat-name"></label>
+        <label>PHRF<input id="boat-phrf" type="number" inputmode="numeric"></label>
+        <label>Phone to bow (m)<input id="boat-bow" type="number" step="0.5" inputmode="decimal"></label>
+      </div>
+      <div class="meta">Phone to bow: roughly how far forward the bow is from where the phone rides. Used to time the bow, not the phone.</div>
+    </div>
+
+    <div class="card" id="line-start"></div>
+    <div class="card" id="line-finish"></div>
+
+    <div class="card">
+      <h2>Share the course</h2>
+      <div class="meta">Copy this code and text it to the other boats. When they load it, their pins merge with yours, so every extra pin makes the line more accurate.</div>
+      <textarea id="course-out" readonly></textarea>
+      <div class="row"><button class="btn small" id="course-copy">Copy course code</button></div>
+      <label>Paste a course code from another boat<textarea id="course-in" placeholder="PGC1:…"></textarea></label>
+      <div class="row">
+        <button class="btn small" id="course-merge">Merge pins</button>
+        <button class="btn ghost small" id="course-replace">Replace my course</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- RACE -->
+  <section class="panel" id="p-race" hidden>
+    <div class="card">
+      <div class="phase" id="r-phase">Before start</div>
+      <div class="clock" id="r-clock">--:--</div>
+      <div id="r-banner" hidden></div>
+      <div class="stats" id="r-stats"></div>
+    </div>
+    <div class="card">
+      <canvas id="map" aria-label="Map of start line, finish line and your track"></canvas>
+      <div class="status"><span><i class="dot" id="src-dot"></i><span id="src-txt">No position</span></span><span id="acc-txt"></span></div>
+    </div>
+    <div class="card">
+      <h2>Controls</h2>
+      <div class="row">
+        <button class="btn flag" id="arm">Arm horn &amp; keep screen on</button>
+        <button class="btn" id="gps">Start GPS</button>
+      </div>
+      <div class="row">
+        <button class="btn ghost small" id="reset">Reset race</button>
+        <button class="btn ghost small" id="copy-result">Copy my result</button>
+      </div>
+      <div id="gps-msg" class="meta"></div>
+    </div>
+    <div class="card">
+      <h2>Simulator</h2>
+      <div class="meta">Sails a fake boat through the start and finish on the course above, using a fast clock. Use it to test the course at the dock, or in November.</div>
+      <div class="row">
+        <label>Speed<select id="sim-speed"><option value="1">1×</option><option value="10">10×</option><option value="30" selected>30×</option><option value="60">60×</option></select></label>
+        <label>Start<select id="sim-ocs"><option value="0">Clean start</option><option value="1">Over early, then return</option></select></label>
+      </div>
+      <div class="row"><button class="btn" id="sim">Run simulator</button></div>
+    </div>
+  </section>
+
+  <!-- RESULTS -->
+  <section class="panel" id="p-results" hidden>
+    <div class="card">
+      <h2>Score the race</h2>
+      <div class="meta">Each boat taps <b>Copy my result</b> after finishing and texts the code to whoever is scoring. Paste the codes here, one per line. The example codes below are made up; replace them.</div>
+      <textarea id="res-in" style="min-height:140px"></textarea>
+      <div class="row">
+        <label>Scoring<select id="res-mode"><option value="tod">PHRF time on distance</option><option value="tot">PHRF time on time (650/550+PHRF)</option></select></label>
+        <label>Course distance (nm)<input id="res-dist" type="number" step="0.01" placeholder="from codes"></label>
+      </div>
+      <div class="row"><button class="btn" id="res-score">Score</button><button class="btn ghost small" id="res-csv">Copy as CSV</button></div>
+    </div>
+    <div class="card">
+      <h2 id="res-title">Results</h2>
+      <div class="tablewrap"><table id="res-table"></table></div>
+      <div class="meta" id="res-note"></div>
+    </div>
+  </section>
+</div>
+<div class="toast" id="toast" hidden></div>
+
+<script>
+(()=>{
+"use strict";
+const $=s=>document.querySelector(s);
+const DEG=Math.PI/180;
+const LS='pinandgun.v1';
+
+/* ---------- config & storage ---------- */
+function defaultCfg(){
+  const s=new Date(); s.setMinutes(s.getMinutes()+20,0,0);
+  const p=(lat,lon)=>({lat,lon,n:1,spread:0,by:'example',how:'typed',t:1});
+  return {race:'Example course: Pultneyville to Sodus Point', start:s.getTime(),
+    boat:{name:'My Boat',phrf:174,bow:8},
+    lines:{start:{A:[p(43.2965,-77.1830)],B:[p(43.2915,-77.1830)]},
+           finish:{A:[p(43.2905,-76.9900)],B:[p(43.2845,-76.9900)]}}};
+}
+let cfg;
+try{cfg=JSON.parse(localStorage.getItem(LS))}catch(e){}
+if(!cfg||!cfg.lines) cfg=defaultCfg();
+function save(){try{localStorage.setItem(LS,JSON.stringify(cfg))}catch(e){}}
+
+/* ---------- geometry ---------- */
+const median=a=>{const s=[...a].sort((x,y)=>x-y),m=s.length>>1;return s.length%2?s[m]:(s[m-1]+s[m])/2};
+function endPos(line,end){
+  const pins=cfg.lines[line][end]; if(!pins.length) return null;
+  return {lat:median(pins.map(p=>p.lat)),lon:median(pins.map(p=>p.lon))};
+}
+let O=null; // projection origin
+function setOrigin(){
+  const a=endPos('start','A'),b=endPos('start','B');
+  O=a&&b?{lat:(a.lat+b.lat)/2,lon:(a.lon+b.lon)/2}:(a||b||endPos('finish','A')||{lat:43.29,lon:-77.1});
+}
+const xy=p=>({x:(p.lon-O.lon)*Math.cos(O.lat*DEG)*111320,y:(p.lat-O.lat)*110574});
+const ll=(x,y)=>({lat:O.lat+y/110574,lon:O.lon+x/(Math.cos(O.lat*DEG)*111320)});
+const cross=(ax,ay,bx,by)=>ax*by-ay*bx;
+function getLine(key){
+  const a=endPos(key,'A'),b=endPos(key,'B'); if(!a||!b) return null;
+  const A=xy(a),B=xy(b),dx=B.x-A.x,dy=B.y-A.y,len=Math.hypot(dx,dy);
+  if(len<5) return null;
+  return {a,b,A,B,dx,dy,len,mid:{x:(A.x+B.x)/2,y:(A.y+B.y)/2}};
+}
+const side=(L,P)=>cross(L.dx,L.dy,P.x-L.A.x,P.y-L.A.y)/L.len; // signed metres, + = left of A→B
+function segHit(L,P0,P1){
+  const rx=P1.x-P0.x,ry=P1.y-P0.y,d=cross(rx,ry,L.dx,L.dy); if(Math.abs(d)<1e-9) return null;
+  const qx=L.A.x-P0.x,qy=L.A.y-P0.y,t=cross(qx,qy,L.dx,L.dy)/d,u=cross(qx,qy,rx,ry)/d;
+  return (t>=0&&t<=1&&u>=0&&u<=1)?t:null;
+}
+const brg=(dx,dy)=>((Math.atan2(dx,dy)/DEG)+360)%360;
+const fmtBrg=b=>String(Math.round(b)%360).padStart(3,'0')+'°';
+const nm=m=>m/1852;
+
+/* ---------- time ---------- */
+const sim={on:false,clock:0,speed:30,pts:[],i:0,last:0};
+const now=()=>sim.on?sim.clock:Date.now();
+function hms(ms,sign){
+  const neg=ms<0; let s=Math.round(Math.abs(ms)/1000);
+  const h=Math.floor(s/3600); s-=h*3600; const m=Math.floor(s/60); s-=m*60;
+  const t=(h?h+':'+String(m).padStart(2,'0'):String(m))+':'+String(s).padStart(2,'0');
+  return (neg&&sign?'−':'')+t;
+}
+const clockStr=t=>new Date(t).toLocaleTimeString([], {hour:'numeric',minute:'2-digit',second:'2-digit'});
+function toLocalInput(t){const d=new Date(t),z=n=>String(n).padStart(2,'0');return `${d.getFullYear()}-${z(d.getMonth()+1)}-${z(d.getDate())}T${z(d.getHours())}:${z(d.getMinutes())}:${z(d.getSeconds())}`}
+
+/* ---------- toast ---------- */
+let toastT;function toast(msg){const t=$('#toast');t.textContent=msg;t.hidden=false;clearTimeout(toastT);toastT=setTimeout(()=>t.hidden=true,2600)}
+async function copy(text,ta){
+  try{await navigator.clipboard.writeText(text);toast('Copied')}
+  catch(e){if(ta){ta.focus();ta.select();toast('Selected. Use your phone’s Copy.')}else toast('Copy not allowed here')}
+}
+
+/* ---------- codes ---------- */
+const enc=o=>btoa(unescape(encodeURIComponent(JSON.stringify(o))));
+const dec=s=>JSON.parse(decodeURIComponent(escape(atob(s))));
+function courseCode(){return 'PGC1:'+enc({race:cfg.race,start:cfg.start,lines:cfg.lines})}
+
+/* ---------- course UI ---------- */
+const lineNames={start:'Start line',finish:'Finish line'};
+function renderLine(key){
+  setOrigin();
+  const L=getLine(key), el=$('#line-'+key);
+  let h=`<h2>${lineNames[key]}</h2>`;
+  h+=L?`<div class="meta">Length ${Math.round(L.len)} m · runs ${fmtBrg(brg(L.dx,L.dy))} from A to B</div>`:`<div class="meta">Pin both ends to define this line.</div>`;
+  h+='<div class="ends">';
+  for(const end of ['A','B']){
+    const pins=cfg.lines[key][end], p=endPos(key,end);
+    h+=`<div class="end"><h3>End ${end}</h3>`;
+    h+=p?`<div class="pos">${p.lat.toFixed(5)}, ${p.lon.toFixed(5)}</div><div class="meta">${pins.length} pin${pins.length>1?'s':''}, median used</div>`:`<div class="meta">Not set</div>`;
+    if(pins.length){
+      h+='<ul class="pins">';
+      pins.forEach((q,i)=>{
+        const d=p?Math.hypot(xy(q).x-xy(p).x,xy(q).y-xy(p).y):0;
+        h+=`<li class="${d>30?'far':''}"><span>${q.by.slice(0,10)} · ${q.how}${pins.length>1?' · '+Math.round(d)+' m off':''}</span><button aria-label="Remove pin" data-del="${key}.${end}.${i}">✕</button></li>`;
+      });
+      h+='</ul>';
+    }
+    h+=`<button class="btn small" data-pin="${key}.${end}">Pin here</button>
+      <details><summary>Pin options</summary>
+        <div class="row"><label>Mark is<select id="side-${key}${end}"><option value="0">Alongside the phone</option><option value="-1">To port</option><option value="1">To starboard</option></select></label>
+        <label>Meters away<input id="off-${key}${end}" type="number" value="3" inputmode="decimal"></label></div>
+        <div class="row"><label>Lat<input id="lat-${key}${end}" inputmode="decimal" placeholder="43.29500"></label><label>Lon<input id="lon-${key}${end}" inputmode="decimal" placeholder="-77.18300"></label></div>
+        <button class="btn ghost small" data-typed="${key}.${end}">Add typed position</button>
+        <div class="row"><label>Bearing from End ${end==='A'?'B':'A'} (°T)<input id="brg-${key}${end}" type="number" inputmode="numeric"></label><label>Length (m)<input id="len-${key}${end}" type="number" inputmode="numeric"></label></div>
+        <button class="btn ghost small" data-bearing="${key}.${end}">Set by bearing</button>
+        <button class="btn ghost small" data-clear="${key}.${end}">Clear all pins</button>
+      </details></div>`;
+  }
+  h+='</div>';
+  if(L&&key==='finish'){const S=getLine('start'); if(S) h+=`<div class="meta">Course: ${nm(Math.hypot(L.mid.x-S.mid.x,L.mid.y-S.mid.y)).toFixed(2)} nm, ${fmtBrg(brg(L.mid.x-S.mid.x,L.mid.y-S.mid.y))} start to finish (rhumb line)</div>`}
+  el.innerHTML=h;
+}
+function renderCourse(){
+  $('#race-name').value=cfg.race; $('#race-start').value=toLocalInput(cfg.start);
+  $('#boat-name').value=cfg.boat.name; $('#boat-phrf').value=cfg.boat.phrf; $('#boat-bow').value=cfg.boat.bow;
+  renderLine('start'); renderLine('finish'); $('#course-out').value=courseCode();
+}
+function courseChanged(){save();renderLine('start');renderLine('finish');$('#course-out').value=courseCode();resetRace(true)}
+
+$('#race-name').addEventListener('change',e=>{cfg.race=e.target.value;save();$('#course-out').value=courseCode()});
+$('#race-start').addEventListener('change',e=>{const t=new Date(e.target.value).getTime();if(t){cfg.start=t;save();$('#course-out').value=courseCode();resetRace(true)}});
+$('#start-plus10').addEventListener('click',()=>{const d=new Date(Date.now()+600000);d.setSeconds(0,0);cfg.start=d.getTime();renderCourse();save();resetRace(true);toast('Start set to '+clockStr(cfg.start))});
+$('#boat-name').addEventListener('change',e=>{cfg.boat.name=e.target.value||'My Boat';save()});
+$('#boat-phrf').addEventListener('change',e=>{cfg.boat.phrf=+e.target.value||0;save()});
+$('#boat-bow').addEventListener('change',e=>{cfg.boat.bow=+e.target.value||0;save()});
+
+document.addEventListener('click',async e=>{
+  const b=e.target.closest('button'); if(!b) return;
+  const ds=b.dataset;
+  if(ds.del){const [k,en,i]=ds.del.split('.');cfg.lines[k][en].splice(+i,1);courseChanged()}
+  if(ds.clear){const [k,en]=ds.clear.split('.');cfg.lines[k][en]=[];courseChanged()}
+  if(ds.typed){const [k,en]=ds.typed.split('.');const lat=parseFloat($(`#lat-${k}${en}`).value),lon=parseFloat($(`#lon-${k}${en}`).value);
+    if(!(Math.abs(lat)<=90&&Math.abs(lon)<=180)){toast('Enter latitude and longitude in decimal degrees');return}
+    cfg.lines[k][en].push({lat,lon,n:1,spread:0,by:cfg.boat.name,how:'typed',t:Date.now()});courseChanged()}
+  if(ds.bearing){const [k,en]=ds.bearing.split('.');const other=endPos(k,en==='A'?'B':'A');
+    const bg=parseFloat($(`#brg-${k}${en}`).value),len=parseFloat($(`#len-${k}${en}`).value);
+    if(!other){toast('Set the other end first');return} if(!(len>0)||isNaN(bg)){toast('Enter a bearing and a length');return}
+    setOrigin();const P=xy(other);const q=ll(P.x+Math.sin(bg*DEG)*len,P.y+Math.cos(bg*DEG)*len);
+    cfg.lines[k][en].push({...q,n:1,spread:0,by:cfg.boat.name,how:'bearing',t:Date.now()});courseChanged()}
+  if(ds.pin){const [k,en]=ds.pin.split('.');pinHere(k,en,b)}
+});
+
+/* ---------- pinning ---------- */
+async function pinHere(k,en,btn){
+  const sideSel=+$(`#side-${k}${en}`).value, off=parseFloat($(`#off-${k}${en}`).value)||0;
+  btn.disabled=true; const label=btn.textContent; btn.textContent='Hold steady… 10 s';
+  const samples=[];
+  try{
+    if(sim.on){
+      for(let i=0;i<10;i++){samples.push({...lastFix,acc:4});}
+    }else{
+      if(!navigator.geolocation) throw new Error('This browser has no GPS access');
+      await new Promise((res,rej)=>{
+        const id=navigator.geolocation.watchPosition(p=>samples.push({lat:p.coords.latitude,lon:p.coords.longitude,acc:p.coords.accuracy}),
+          err=>{navigator.geolocation.clearWatch(id);rej(err)},{enableHighAccuracy:true,maximumAge:0,timeout:15000});
+        setTimeout(()=>{navigator.geolocation.clearWatch(id);res()},10000);
+      });
+    }
+    if(samples.length<2||!samples[0].lat) throw new Error('Not enough GPS fixes. Try again with a clear view of the sky.');
+    setOrigin();
+    let p={lat:median(samples.map(s=>s.lat)),lon:median(samples.map(s=>s.lon))};
+    if(sideSel&&off){const P=xy(p),h=heading*DEG,a=h+sideSel*Math.PI/2;p=ll(P.x+Math.sin(a)*off,P.y+Math.cos(a)*off)}
+    cfg.lines[k][en].push({...p,n:samples.length,spread:Math.round(median(samples.map(s=>s.acc||0))),by:cfg.boat.name,how:'pinned',t:Date.now()});
+    courseChanged(); toast(`Pinned End ${en} from ${samples.length} fixes`);
+  }catch(err){
+    toast(err.code===1?'Location is blocked here. See the note on the Race tab.':(err.message||'GPS failed'));
+  }finally{btn.disabled=false;btn.textContent=label}
+}
+
+/* ---------- course sharing ---------- */
+$('#course-copy').addEventListener('click',()=>copy($('#course-out').value,$('#course-out')));
+function readCourse(){
+  const s=$('#course-in').value.trim().replace(/^PGC1:/,'');
+  try{const c=dec(s); if(!c.lines) throw 0; return c}catch(e){toast('That doesn’t look like a course code');return null}
+}
+$('#course-merge').addEventListener('click',()=>{
+  const c=readCourse(); if(!c) return; let added=0;
+  for(const k of ['start','finish'])for(const en of ['A','B'])for(const p of c.lines[k][en]){
+    if(!cfg.lines[k][en].some(q=>q.t===p.t&&q.lat===p.lat)){cfg.lines[k][en].push(p);added++}}
+  courseChanged(); $('#course-in').value=''; toast(`Merged ${added} new pin${added===1?'':'s'}`);
+});
+$('#course-replace').addEventListener('click',()=>{
+  const c=readCourse(); if(!c) return; cfg.race=c.race; cfg.start=c.start; cfg.lines=c.lines;
+  save(); renderCourse(); resetRace(true); $('#course-in').value=''; toast('Course loaded');
+});
+
+/* ---------- race engine ---------- */
+let fixes=[], lastFix=null, heading=0, sog=0, race;
+function resetRace(quiet){
+  race={gunDone:false,ocs:false,cleared:false,started:null,finished:null,prevBow:null,prevT:null,overNow:false,signals:new Set()};
+  fixes=[]; if(!quiet) toast('Race reset');
+}
+resetRace(true);
+
+function onFix(f){
+  lastFix=f; fixes.push(f); if(fixes.length>20000) fixes.shift();
+  setOrigin();
+  const P=xy(f);
+  // course over ground from ~5 s of history
+  for(let i=fixes.length-2;i>=0;i--){
+    const g=fixes[i]; if(f.t-g.t>=4000){const Q=xy(g),dx=P.x-Q.x,dy=P.y-Q.y,d=Math.hypot(dx,dy);
+      sog=d/((f.t-g.t)/1000); if(d>3) heading=brg(dx,dy); break;}
+    if(f.t-g.t>15000) break;
+  }
+  const bow={x:P.x+Math.sin(heading*DEG)*cfg.boat.bow,y:P.y+Math.cos(heading*DEG)*cfg.boat.bow};
+  const S=getLine('start'),F=getLine('finish'),t=f.t,gun=cfg.start;
+  if(S&&F){
+    const cs=Math.sign(side(S,F.mid));           // which side of the start line the course is on
+    const fs=Math.sign(side(F,S.mid));           // which side of the finish line the boats come from
+    const sNow=side(S,bow)*cs;                   // + = over (course side)
+    race.overNow=t<gun&&sNow>0;
+    const prev=race.prevBow,pt=race.prevT;
+    if(!race.gunDone&&t>=gun){
+      race.gunDone=true;
+      let g=bow; if(prev&&t>pt){const k=Math.min(1,Math.max(0,(gun-pt)/(t-pt)));g={x:prev.x+(bow.x-prev.x)*k,y:prev.y+(bow.y-prev.y)*k}}
+      if(side(S,g)*cs>0){race.ocs=true;horn('ocs')}
+    }
+    if(race.gunDone&&prev){
+      if(!race.started){
+        if(race.ocs&&!race.cleared&&sNow<0){race.cleared=true;toast('Cleared. Now start properly.')}
+        if(!race.ocs||race.cleared){
+          const k=segHit(S,prev,bow);
+          if(k!==null&&side(S,prev)*cs<0&&sNow>0){const ct=pt+k*(t-pt); if(ct>=gun){race.started=ct;toast('Started at '+clockStr(ct))}}
+        }
+      }
+      if(!race.finished){
+        const k=segHit(F,prev,bow);
+        if(k!==null&&side(F,prev)*fs>0&&side(F,bow)*fs<0){race.finished=pt+k*(t-pt);horn('finish');go('race')}
+      }
+    }
+  }
+  race.prevBow=bow; race.prevT=t; race.bow=bow; race.P=P;
+}
+
+/* ---------- horn ---------- */
+let ac=null, wake=null;
+function horn(kind){
+  try{navigator.vibrate&&navigator.vibrate(kind==='tick'?60:kind==='ocs'?[300,150,300,150,300]:600)}catch(e){}
+  if(!ac) return;
+  const seq=kind==='tick'?[[0,.08,1200]]:kind==='ocs'?[[0,.25,520],[.35,.25,520],[.7,.25,520]]:kind==='finish'?[[0,.3,880],[.4,.6,880]]:[[0,.8,660]];
+  for(const [at,dur,fq] of seq){const o=ac.createOscillator(),g=ac.createGain();o.type='square';o.frequency.value=fq;
+    g.gain.setValueAtTime(.0001,ac.currentTime+at);g.gain.exponentialRampToValueAtTime(.4,ac.currentTime+at+.02);
+    g.gain.setValueAtTime(.4,ac.currentTime+at+dur-.03);g.gain.exponentialRampToValueAtTime(.0001,ac.currentTime+at+dur);
+    o.connect(g).connect(ac.destination);o.start(ac.currentTime+at);o.stop(ac.currentTime+at+dur+.05);}
+}
+async function arm(){
+  try{if(!ac){ac=new (window.AudioContext||window.webkitAudioContext)()} await ac.resume()}catch(e){}
+  try{if('wakeLock' in navigator){wake=await navigator.wakeLock.request('screen')}}catch(e){wake=null}
+  $('#arm').textContent=wake?'Armed · screen stays on':'Armed (screen lock not allowed)';
+}
+$('#arm').addEventListener('click',async()=>{await arm();horn('tick')});
+document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'&&wake){arm()}});
+function signals(){
+  const rem=Math.ceil((cfg.start-now())/1000);
+  for(const s of [300,240,60,0]){if(rem<=s&&rem>s-3&&!race.signals.has(s)){race.signals.add(s);horn(s===0?'gun':'signal')}}
+  if(rem>0&&rem<=10&&!race.signals.has('t'+rem)){race.signals.add('t'+rem);horn('tick')}
+}
+
+/* ---------- GPS ---------- */
+let watchId=null;
+$('#gps').addEventListener('click',()=>{
+  if(watchId!==null){navigator.geolocation.clearWatch(watchId);watchId=null;$('#gps').textContent='Start GPS';return}
+  if(sim.on) stopSim();
+  if(!navigator.geolocation){$('#gps-msg').textContent='This browser has no location access.';return}
+  arm();
+  watchId=navigator.geolocation.watchPosition(p=>{
+    accuracy=p.coords.accuracy; onFix({lat:p.coords.latitude,lon:p.coords.longitude,t:p.timestamp||Date.now()});
+    $('#gps-msg').textContent='';
+  },err=>{
+    $('#gps-msg').textContent=err.code===1
+      ?'Location is blocked on this page. The claude.ai preview never allows GPS; open the standalone Pin & Gun file from a website instead. The simulator works here.'
+      :'GPS error: '+err.message;
+    navigator.geolocation.clearWatch(watchId);watchId=null;$('#gps').textContent='Start GPS';
+  },{enableHighAccuracy:true,maximumAge:0,timeout:20000});
+  $('#gps').textContent='Stop GPS';
+});
+let accuracy=null;
+
+/* ---------- simulator ---------- */
+function buildSim(ocs){
+  setOrigin(); const S=getLine('start'),F=getLine('finish'); if(!S||!F) return null;
+  const cs=Math.sign(side(S,F.mid)), ux=S.dx/S.len, uy=S.dy/S.len;
+  const nx=-uy*cs, ny=ux*cs;                       // unit normal toward the course
+  const fs=Math.sign(side(F,S.mid)), fnx=-(F.dy/F.len)*fs*-1, fny=(F.dx/F.len)*fs*-1; // normal pointing past finish
+  const gun=cfg.start, v=3.1, wp=[];
+  const at=(dt,x,y)=>wp.push({t:gun+dt*1000,x,y});
+  const H={x:S.mid.x-nx*220-ux*40,y:S.mid.y-ny*220-uy*40};
+  for(let s=-360;s<=-150;s+=10){const a=s/120*2*Math.PI;at(s,H.x+Math.cos(a)*50,H.y+Math.sin(a)*50)}
+  const C={x:S.mid.x+ux*S.len*.15,y:S.mid.y+uy*S.len*.15};
+  // approach run along the course direction so the bow leads
+  at(-60,C.x-nx*120,C.y-ny*120);
+  let tc;
+  if(ocs){
+    at(-8,C.x,C.y); at(4,C.x+nx*30,C.y+ny*30); at(30,C.x+nx*10+ux*30,C.y+ny*10+uy*30);
+    at(50,C.x-nx*35+ux*40,C.y-ny*35+uy*40); at(75,C.x-nx*5+ux*45,C.y-ny*5+uy*45); tc=95;
+    at(tc,C.x+nx*60+ux*45,C.y+ny*60+uy*45);
+  }else{at(9,C.x,C.y);tc=9;}
+  const last=wp[wp.length-1], T={x:F.mid.x+fnx*80,y:F.mid.y+fny*80};
+  const dist=Math.hypot(T.x-last.x,T.y-last.y), legs=Math.max(2,Math.round(dist/900));
+  for(let i=1;i<=legs;i++){const k=i/legs,w=(i<legs?(i%2?1:-1)*60:0);
+    at((last.t-gun)/1000+dist*k/v,last.x+(T.x-last.x)*k+(-(T.y-last.y)/dist)*w,last.y+(T.y-last.y)*k+((T.x-last.x)/dist)*w)}
+  return wp;
+}
+function simPos(t){
+  const w=sim.pts; if(t<=w[0].t) return w[0];
+  while(sim.i<w.length-2&&w[sim.i+1].t<t) sim.i++;
+  const a=w[sim.i],b=w[Math.min(sim.i+1,w.length-1)]; if(t>=b.t) return b;
+  const k=(t-a.t)/(b.t-a.t); return {x:a.x+(b.x-a.x)*k,y:a.y+(b.y-a.y)*k};
+}
+const gauss=()=>{let u=0,v=0;while(!u)u=Math.random();while(!v)v=Math.random();return Math.sqrt(-2*Math.log(u))*Math.cos(2*Math.PI*v)};
+function stopSim(){sim.on=false;$('#sim').textContent='Run simulator';resetRace(true);fixes=[];lastFix=null}
+$('#sim').addEventListener('click',()=>{
+  if(sim.on){stopSim();toast('Simulator stopped');return}
+  const wp=buildSim($('#sim-ocs').value==='1'); if(!wp){toast('Set both ends of the start and finish lines first');return}
+  if(watchId!==null){navigator.geolocation.clearWatch(watchId);watchId=null;$('#gps').textContent='Start GPS'}
+  arm(); resetRace(true);
+  Object.assign(sim,{on:true,pts:wp,i:0,clock:cfg.start-330000,last:cfg.start-331000,speed:+$('#sim-speed').value,real:performance.now()});
+  accuracy=4; $('#sim').textContent='Stop simulator'; toast('Simulator running: 5:30 before the start');
+});
+$('#sim-speed').addEventListener('change',e=>sim.speed=+e.target.value);
+
+/* ---------- race UI ---------- */
+function stat(v,l){return `<div class="stat"><b>${v}</b><span>${l}</span></div>`}
+function renderRace(){
+  const t=now(), rem=cfg.start-t, S=getLine('start'), F=getLine('finish');
+  let phase, clock, banner='', bcls='', st='';
+  const kn=(sog*1.94384);
+  if(race.finished){
+    phase='Finished'; clock=hms(race.finished-cfg.start);
+    banner=race.ocs&&!race.cleared?'Finished, but scored OCS (never cleared the start)':`Finished at ${clockStr(race.finished)} · elapsed ${hms(race.finished-cfg.start)}`;
+    bcls=race.ocs&&!race.cleared?'red':'green';
+    st=stat(cfg.boat.phrf,'PHRF')+stat(F&&S?nm(Math.hypot(F.mid.x-S.mid.x,F.mid.y-S.mid.y)).toFixed(2):'–','Course nm')+stat(race.started?hms(race.started-cfg.start):'–','Start late by');
+  }else if(rem>0){
+    phase=rem>300000?'Before the warning':rem>240000?'Warning signal':rem>60000?'Preparatory':'One minute';
+    clock=hms(rem);
+    if(race.overNow){banner='Over the line. Get back.';bcls='red'}
+    let line='–',ttl='–',burn='–';
+    if(S&&F&&race.bow){
+      const cs=Math.sign(side(S,F.mid)), behind=-side(S,race.bow)*cs;
+      line=Math.round(behind)+' m';
+      const n={x:-S.dy/S.len*cs,y:S.dx/S.len*cs},v={x:Math.sin(heading*DEG)*sog,y:Math.cos(heading*DEG)*sog},close=v.x*n.x+v.y*n.y;
+      if(close>0.2&&behind>0){const tt=behind/close*1000;ttl=hms(tt);burn=hms(rem-tt,true)}
+    }
+    st=stat(line,'To line')+stat(ttl,'Time to line')+stat(burn,'Time to burn');
+  }else{
+    phase=race.started?'Racing':race.ocs&&!race.cleared?'Over early':'Started · cross the line';
+    clock=hms(-rem);
+    if(race.ocs&&!race.cleared){banner='OCS: return to the pre-start side and start again';bcls='red'}
+    else if(race.ocs&&race.cleared&&!race.started){banner='Cleared. Cross the start line.';bcls='flag'}
+    let d='–',b='–';
+    if(F&&race.bow){const dx=F.mid.x-race.bow.x,dy=F.mid.y-race.bow.y;d=nm(Math.hypot(dx,dy)).toFixed(2);b=fmtBrg(brg(dx,dy))}
+    st=stat(d,'Finish nm')+stat(b,'Bearing °T')+stat(kn.toFixed(1),'Speed kn');
+  }
+  if(!S||!F){banner='Set both ends of the start and finish lines on the Course tab.';bcls='flag'}
+  $('#r-phase').textContent=phase+(sim.on?` · simulator ${sim.speed}×`:'');
+  $('#r-clock').textContent=clock;
+  const bn=$('#r-banner'); bn.hidden=!banner; bn.className='banner '+bcls; bn.textContent=banner;
+  $('#r-stats').innerHTML=st;
+  const live=sim.on||watchId!==null; $('#src-dot').className='dot'+(live&&lastFix?' on':'');
+  $('#src-txt').textContent=sim.on?'Simulated GPS':watchId!==null?(lastFix?'GPS live':'Waiting for GPS…'):'GPS off';
+  $('#acc-txt').textContent=live&&accuracy?`±${Math.round(accuracy)} m · heading ${fmtBrg(heading)}`:'';
+  drawMap();
+}
+
+/* ---------- map ---------- */
+function drawMap(){
+  const cv=$('#map'),dpr=window.devicePixelRatio||1,w=cv.clientWidth,h=cv.clientHeight;
+  if(!w) return;
+  if(cv.width!==w*dpr||cv.height!==h*dpr){cv.width=w*dpr;cv.height=h*dpr}
+  const c=cv.getContext('2d'),css=getComputedStyle(document.documentElement),col=n=>css.getPropertyValue(n).trim();
+  c.setTransform(dpr,0,0,dpr,0,0); c.clearRect(0,0,w,h);
+  setOrigin(); const S=getLine('start'),F=getLine('finish'); if(!S) return;
+  // choose view: near start before/just after gun, near finish when close, else whole course
+  let pts=[S.A,S.B];
+  const P=race.P, nearFinish=F&&P&&Math.hypot(F.mid.x-P.x,F.mid.y-P.y)<900;
+  if(F&&(race.finished||nearFinish)) pts=[F.A,F.B].concat(P?[P]:[]);
+  else if(now()<cfg.start+120000||!F){pts=pts.concat(P?[P]:[])}
+  else pts=[S.A,S.B,F.A,F.B].concat(P?[P]:[]);
+  let x0=Infinity,x1=-Infinity,y0=Infinity,y1=-Infinity;
+  for(const p of pts){x0=Math.min(x0,p.x);x1=Math.max(x1,p.x);y0=Math.min(y0,p.y);y1=Math.max(y1,p.y)}
+  const pad=Math.max(80,(x1-x0)*.15,(y1-y0)*.15);x0-=pad;x1+=pad;y0-=pad;y1+=pad;
+  const sc=Math.min(w/(x1-x0),h/(y1-y0)),cx=(x0+x1)/2,cy=(y0+y1)/2;
+  const X=x=>w/2+(x-cx)*sc,Y=y=>h/2-(y-cy)*sc;
+  // scale bar
+  const bar=[50,100,200,500,1000,2000,5000,10000].find(m=>m*sc>60)||10000;
+  c.strokeStyle=col('--muted');c.fillStyle=col('--muted');c.lineWidth=1.5;c.beginPath();c.moveTo(12,h-14);c.lineTo(12+bar*sc,h-14);c.stroke();
+  c.font='11px '+col('--mono');c.fillText(bar>=1000?bar/1000+' km':bar+' m',12,h-20);
+  c.fillText('N ↑',w-34,18);
+  const drawLine=(L,color,label)=>{
+    c.strokeStyle=color;c.lineWidth=3;c.setLineDash([8,6]);c.beginPath();c.moveTo(X(L.A.x),Y(L.A.y));c.lineTo(X(L.B.x),Y(L.B.y));c.stroke();c.setLineDash([]);
+    for(const [p,n] of [[L.A,'A'],[L.B,'B']]){c.fillStyle=color;c.beginPath();c.arc(X(p.x),Y(p.y),6,0,7);c.fill();c.fillStyle=col('--ink');c.font='bold 12px '+col('--body');c.fillText(n,X(p.x)+9,Y(p.y)+4)}
+    c.fillStyle=col('--muted');c.font='11px '+col('--body');c.fillText(label,X(L.mid.x)+10,Y(L.mid.y)-8);
+  };
+  // individual pins
+  for(const k of ['start','finish'])for(const en of ['A','B'])for(const p of cfg.lines[k][en]){const q=xy(p);c.fillStyle=col('--muted');c.beginPath();c.arc(X(q.x),Y(q.y),2.5,0,7);c.fill()}
+  drawLine(S,col('--green'),'Start');
+  if(F) drawLine(F,col('--red'),'Finish');
+  // track
+  if(fixes.length>1){c.strokeStyle=col('--track');c.lineWidth=2;c.beginPath();
+    const step=Math.max(1,Math.floor(fixes.length/1500));
+    fixes.forEach((f,i)=>{if(i%step&&i!==fixes.length-1)return;const q=xy(f);i?c.lineTo(X(q.x),Y(q.y)):c.moveTo(X(q.x),Y(q.y))});c.stroke()}
+  if(P&&race.bow){
+    const a=heading*DEG,bx=X(race.bow.x),by=Y(race.bow.y),L=Math.max(14,cfg.boat.bow*sc);
+    c.fillStyle=race.overNow||(race.ocs&&!race.cleared)?col('--red'):col('--flag');c.strokeStyle=col('--ink');c.lineWidth=1.5;
+    c.beginPath();c.moveTo(bx,by);
+    c.lineTo(bx-Math.sin(a)*L+Math.cos(a)*6,by+Math.cos(a)*L+Math.sin(a)*6);
+    c.lineTo(bx-Math.sin(a)*L-Math.cos(a)*6,by+Math.cos(a)*L-Math.sin(a)*6);c.closePath();c.fill();c.stroke();
+  }
+}
+
+/* ---------- result code ---------- */
+function resultCode(){
+  setOrigin();const S=getLine('start'),F=getLine('finish');
+  const dist=S&&F?+nm(Math.hypot(F.mid.x-S.mid.x,F.mid.y-S.mid.y)).toFixed(3):0;
+  const status=!race.finished?'DNF':race.ocs&&!race.cleared?'OCS':'OK';
+  return 'PG1:'+enc({race:cfg.race,boat:cfg.boat.name,phrf:cfg.boat.phrf,gun:cfg.start,start:race.started,fin:race.finished,status,dist});
+}
+$('#copy-result').addEventListener('click',()=>copy(resultCode()));
+$('#reset').addEventListener('click',()=>{if(sim.on)stopSim();resetRace()});
+
+/* ---------- results ---------- */
+function exampleCodes(){
+  const gun=Date.UTC(2026,6,16,22,30,0),d=8.92;
+  const boats=[['Whisper',174,6020],['Second Wind',150,5810],['Blue Heron',198,6400],['Kestrel',123,5650],['Margaret Ann',222,0]];
+  return '# Example codes (made-up boats). Replace with real ones.\n'+boats.map(([b,p,s])=>'PG1:'+enc({race:'Example race',boat:b,phrf:p,gun,start:gun+20000,fin:s?gun+s*1000:null,status:s?(b==='Kestrel'?'OCS':'OK'):'DNF',dist:d})).join('\n');
+}
+let lastRows=[];
+function score(){
+  const lines=$('#res-in').value.split(/\n/).map(s=>s.trim()).filter(s=>s&&!s.startsWith('#'));
+  const mode=$('#res-mode').value, ov=parseFloat($('#res-dist').value), rows=[], bad=[];
+  for(const l of lines){try{const r=dec(l.replace(/^PG1:/,''));if(!r.boat)throw 0;rows.push(r)}catch(e){bad.push(l.slice(0,16)+'…')}}
+  const seen=new Map(); rows.forEach(r=>seen.set(r.boat+'|'+r.gun,r)); const uniq=[...seen.values()];
+  for(const r of uniq){
+    const dist=ov>0?ov:r.dist;
+    r.el=r.fin?(r.fin-r.gun)/1000:null;
+    r.cor=r.el==null||r.status!=='OK'?null:mode==='tod'?r.el-r.phrf*dist:r.el*650/(550+r.phrf);
+  }
+  uniq.sort((a,b)=>(a.cor??1e12)-(b.cor??1e12)||(a.el??1e12)-(b.el??1e12));
+  let place=0; const best=uniq.find(r=>r.cor!=null);
+  let h='<thead><tr><th>#</th><th>Boat</th><th class="num">PHRF</th><th class="num">Finish</th><th class="num">Elapsed</th><th class="num">Corrected</th><th class="num">Behind</th></tr></thead><tbody>';
+  for(const r of uniq){
+    const ok=r.cor!=null;
+    h+=`<tr class="${r.status==='OCS'?'ocs':''}"><td>${ok?++place:r.status}</td><td>${esc(r.boat)}</td><td class="num">${r.phrf}</td><td class="num">${r.fin?clockStr(r.fin):'–'}</td><td class="num">${r.el!=null?hms(r.el*1000):'–'}</td><td class="num">${ok?hms(r.cor*1000):'–'}</td><td class="num">${ok&&best?(r===best?'–':'+'+hms((r.cor-best.cor)*1000)):''}</td></tr>`;
+  }
+  h+='</tbody>';
+  $('#res-table').innerHTML=uniq.length?h:'<tbody><tr><td>No result codes yet.</td></tr></tbody>';
+  const races=[...new Set(uniq.map(r=>r.race))];
+  $('#res-title').textContent=races.length===1?races[0]:'Results';
+  $('#res-note').textContent=(mode==='tod'?'Time on distance: corrected = elapsed − PHRF × distance.':'Time on time: corrected = elapsed × 650 ÷ (550 + PHRF).')
+    +(races.length>1?' Warning: these codes come from different races.':'')+(bad.length?` Skipped ${bad.length} unreadable line${bad.length>1?'s':''}.`:'');
+  lastRows=uniq;
+}
+const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+$('#res-score').addEventListener('click',score);
+$('#res-mode').addEventListener('change',score);
+$('#res-csv').addEventListener('click',()=>{
+  const csv=['Place,Boat,PHRF,Finish,Elapsed,Corrected,Status'].concat(lastRows.map((r,i)=>[r.cor!=null?i+1:'',`"${r.boat}"`,r.phrf,r.fin?clockStr(r.fin):'',r.el!=null?hms(r.el*1000):'',r.cor!=null?hms(r.cor*1000):'',r.status].join(','))).join('\n');
+  copy(csv);
+});
+
+/* ---------- tabs & loop ---------- */
+function go(tab){
+  document.querySelectorAll('nav button').forEach(b=>b.setAttribute('aria-selected',b.dataset.tab===tab));
+  for(const p of ['course','race','results']) $('#p-'+p).hidden=p!==tab;
+  try{sessionStorage.setItem(LS+'tab',tab)}catch(e){}
+  if(tab==='race') renderRace();
+}
+document.querySelectorAll('nav button').forEach(b=>b.addEventListener('click',()=>go(b.dataset.tab)));
+
+let lastUI=0;
+function loop(ts){
+  if(sim.on){
+    const dt=ts-sim.real; sim.real=ts; sim.clock+=dt*sim.speed;
+    while(sim.last+1000<=sim.clock){
+      sim.last+=1000; setOrigin(); const p=simPos(sim.last);
+      onFix({...ll(p.x+gauss()*1.5,p.y+gauss()*1.5),t:sim.last});
+      if(sim.last>sim.pts[sim.pts.length-1].t+60000){sim.on=false;$('#sim').textContent='Run simulator';break}
+    }
+  }
+  signals();
+  if(ts-lastUI>200){lastUI=ts;if(!$('#p-race').hidden)renderRace()}
+  requestAnimationFrame(loop);
+}
+
+renderCourse();
+$('#res-in').value=exampleCodes(); score();
+let startTab='course'; try{startTab=sessionStorage.getItem(LS+'tab')||'course'}catch(e){}
+go(startTab);
+requestAnimationFrame(loop);
+window.addEventListener('resize',()=>{if(!$('#p-race').hidden)drawMap()});
+})();
+</script>
+
+</body></html>
