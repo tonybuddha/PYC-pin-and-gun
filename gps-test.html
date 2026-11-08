@@ -1,0 +1,207 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>GPS Scatter Test</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<style>
+:root{--bg:#eef2f4;--card:#fff;--ink:#0e2130;--muted:#5a6b78;--rule:#cfd8de;--navy:#16395c;--flag:#f2b01e;--red:#c2321c;--green:#1d7647;--pt:rgba(22,57,92,.35)}
+@media (prefers-color-scheme:dark){:root{--bg:#0a1319;--card:#111e27;--ink:#e3ecf2;--muted:#8ea1ae;--rule:#24353f;--navy:#3f80c4;--red:#ff6b52;--green:#4cc58a;--pt:rgba(127,179,230,.4);color-scheme:dark}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.45 system-ui,-apple-system,"Segoe UI",sans-serif}
+.wrap{max-width:640px;margin:0 auto;padding:16px max(16px,env(safe-area-inset-right)) 40px max(16px,env(safe-area-inset-left));display:flex;flex-direction:column;gap:14px}
+h1{margin:0;font-size:1.5rem}
+.card{background:var(--card);border:1px solid var(--rule);border-radius:12px;padding:14px;display:flex;flex-direction:column;gap:10px}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+button,select{font:inherit;padding:10px 14px;border-radius:9px;border:1px solid var(--rule);background:var(--card);color:var(--ink);cursor:pointer}
+button.go{background:var(--navy);color:#fff;border-color:var(--navy);font-weight:700}
+button.stop{background:var(--red);color:#fff;border-color:var(--red);font-weight:700}
+button:disabled{opacity:.4}
+.meta{font-size:.85rem;color:var(--muted)}
+.big{font-size:2.4rem;font-weight:700;font-variant-numeric:tabular-nums;line-height:1}
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px}
+.stats div{border-top:2px solid var(--rule);padding-top:6px}
+.stats b{display:block;font-size:1.4rem;font-variant-numeric:tabular-nums}
+.stats span{font-size:.72rem;text-transform:uppercase;letter-spacing:.07em;color:var(--muted)}
+canvas{width:100%;display:block;border-radius:10px;background:var(--bg)}
+#scatter{aspect-ratio:1/1}
+#series{height:160px}
+#map{height:320px;border-radius:10px}
+.warn{background:var(--flag);color:#2b1f00;padding:8px 10px;border-radius:8px;font-weight:700;font-size:.9rem}
+ol{margin:0;padding-left:20px}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>GPS Scatter Test</h1>
+
+  <div class="card">
+    <ol class="meta">
+      <li>Put the phone outside with an open view of the sky, and don't move it.</li>
+      <li>Turn on airplane mode, then make sure Wi‑Fi and Bluetooth are off. Location stays on. That leaves GPS as the only way the phone can find itself.</li>
+      <li>Plug it in, start, and leave this page open with the screen on.</li>
+    </ol>
+    <div class="row">
+      <select id="dur"><option value="10">10 min</option><option value="60">1 hour</option><option value="180" selected>3 hours</option></select>
+      <button class="go" id="start">Start recording</button>
+      <button class="stop" id="stop" disabled>Stop</button>
+    </div>
+    <div class="row"><div class="big" id="clock">0:00:00</div><div class="meta" id="status">Not recording</div></div>
+    <div id="warn" class="warn" hidden></div>
+  </div>
+
+  <div class="card">
+    <div class="stats" id="stats"></div>
+    <div class="meta" id="note"></div>
+  </div>
+
+  <div class="card">
+    <b>Scatter around the average position</b>
+    <canvas id="scatter"></canvas>
+    <div class="meta">Each dot is one fix, in meters east and north of the average. Inner ring: half the fixes are inside it. Outer ring: 95% are.</div>
+  </div>
+
+  <div class="card">
+    <b>Distance from average over time</b>
+    <canvas id="series"></canvas>
+  </div>
+
+  <div class="card">
+    <b>Map</b>
+    <div id="map"></div>
+    <div class="meta">The map tiles need an internet connection; they'll fill in after you take the phone out of airplane mode.</div>
+  </div>
+
+  <div class="card">
+    <div class="row">
+      <button id="csv">Save CSV</button>
+      <label class="meta">Load a CSV <input type="file" id="load" accept=".csv,text/csv"></label>
+      <button id="clear">Clear data</button>
+    </div>
+  </div>
+</div>
+
+<script>
+(()=>{
+const $=s=>document.querySelector(s), KEY='gpsScatter.v1';
+let fixes=[], watch=null, wake=null, t0=0, endAt=0, gaps=0, lastT=0;
+try{fixes=JSON.parse(localStorage.getItem(KEY))||[]}catch(e){}
+
+const fmt=ms=>{let s=Math.max(0,Math.floor(ms/1000)),h=Math.floor(s/3600);s-=h*3600;const m=Math.floor(s/60);s-=m*60;return h+':'+String(m).padStart(2,'0')+':'+String(s).padStart(2,'0')};
+const pct=(a,p)=>{if(!a.length)return NaN;const s=[...a].sort((x,y)=>x-y);return s[Math.min(s.length-1,Math.floor(p*s.length))]};
+function persist(){try{localStorage.setItem(KEY,JSON.stringify(fixes))}catch(e){}}
+
+async function lock(){try{if('wakeLock' in navigator&&!wake){wake=await navigator.wakeLock.request('screen');wake.addEventListener('release',()=>wake=null)}}catch(e){}}
+
+$('#start').onclick=async()=>{
+  if(!navigator.geolocation){$('#status').textContent='This browser has no location access.';return}
+  if(fixes.length){fixes=[];persist()}
+  await lock();
+  t0=Date.now(); endAt=t0+ +$('#dur').value*60000; gaps=0; lastT=0;
+  watch=navigator.geolocation.watchPosition(p=>{
+    if(p.timestamp===lastT) return;
+    if(lastT&&p.timestamp-lastT>10000) gaps++;
+    lastT=p.timestamp;
+    const c=p.coords;
+    fixes.push({t:p.timestamp,lat:c.latitude,lon:c.longitude,acc:c.accuracy,alt:c.altitude,altAcc:c.altitudeAccuracy});
+    if(fixes.length%30===0) persist();
+  },err=>{
+    $('#status').textContent=err.code===1?'Location permission denied. Allow it in your browser settings.':'GPS error: '+err.message;
+  },{enableHighAccuracy:true,maximumAge:0,timeout:60000});
+  $('#start').disabled=true;$('#stop').disabled=false;
+};
+function stop(msg){
+  if(watch!==null)navigator.geolocation.clearWatch(watch); watch=null;
+  try{wake&&wake.release()}catch(e){} wake=null; persist();
+  $('#start').disabled=false;$('#stop').disabled=true;$('#status').textContent=msg||'Stopped';
+  analyze();
+}
+$('#stop').onclick=()=>stop('Stopped by you');
+document.addEventListener('visibilitychange',()=>{
+  if(document.visibilityState==='visible'&&watch!==null) lock();
+  if(document.visibilityState==='hidden'&&watch!==null){$('#warn').hidden=false;$('#warn').textContent='The page was hidden or the screen locked. The phone may have stopped GPS for a while; check the gaps count.'}
+});
+
+/* ---------- analysis ---------- */
+function compute(){
+  const n=fixes.length; if(n<2) return null;
+  const lat0=fixes.reduce((a,f)=>a+f.lat,0)/n, lon0=fixes.reduce((a,f)=>a+f.lon,0)/n;
+  const kx=Math.cos(lat0*Math.PI/180)*111320, ky=110574;
+  const pts=fixes.map(f=>{const e=(f.lon-lon0)*kx,nn=(f.lat-lat0)*ky;return{e,n:nn,d:Math.hypot(e,nn),t:f.t,acc:f.acc}});
+  const d=pts.map(p=>p.d);
+  const sdE=Math.sqrt(pts.reduce((a,p)=>a+p.e*p.e,0)/n), sdN=Math.sqrt(pts.reduce((a,p)=>a+p.n*p.n,0)/n);
+  return {n,lat0,lon0,pts,p50:pct(d,.5),p95:pct(d,.95),max:Math.max(...d),sdE,sdN,
+    acc:pct(fixes.map(f=>f.acc).filter(x=>x!=null),.5),dur:fixes[n-1].t-fixes[0].t};
+}
+function analyze(){
+  const r=compute(), S=$('#stats');
+  if(!r){S.innerHTML='<div><b>–</b><span>No fixes yet</span></div>';$('#note').textContent='';clear();return}
+  const m=x=>x.toFixed(1)+' m';
+  S.innerHTML=[[r.n,'Fixes'],[fmt(r.dur),'Span'],[m(r.p50),'Half within'],[m(r.p95),'95% within'],[m(r.max),'Worst'],[m(r.acc),'Phone claims ±'],
+    [m(r.sdE),'Spread east–west'],[m(r.sdN),'Spread north–south'],[gaps,'Gaps over 10 s']].map(([v,l])=>`<div><b>${v}</b><span>${l}</span></div>`).join('');
+  $('#note').textContent=`Average position ${r.lat0.toFixed(6)}, ${r.lon0.toFixed(6)}. "Phone claims" is the median accuracy the phone reported; compare it with "95% within" to see how honest it is.`;
+  drawScatter(r); drawSeries(r); drawMap(r);
+}
+function clear(){for(const id of ['scatter','series']){const c=$('#'+id);c.getContext('2d').clearRect(0,0,c.width,c.height)}}
+function setup(cv){const dpr=devicePixelRatio||1,w=cv.clientWidth,h=cv.clientHeight;cv.width=w*dpr;cv.height=h*dpr;const c=cv.getContext('2d');c.setTransform(dpr,0,0,dpr,0,0);return[c,w,h]}
+const css=n=>getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+function drawScatter(r){
+  const[c,w,h]=setup($('#scatter'));const R=Math.max(3,r.max*1.1),s=Math.min(w,h)/2/R,cx=w/2,cy=h/2;
+  c.strokeStyle=css('--rule');c.lineWidth=1;c.beginPath();c.moveTo(0,cy);c.lineTo(w,cy);c.moveTo(cx,0);c.lineTo(cx,h);c.stroke();
+  c.fillStyle=css('--pt');const step=Math.max(1,Math.floor(r.pts.length/6000));
+  r.pts.forEach((p,i)=>{if(i%step)return;c.fillRect(cx+p.e*s-1.5,cy-p.n*s-1.5,3,3)});
+  for(const [rad,col,lab] of [[r.p50,css('--green'),'50%'],[r.p95,css('--red'),'95%']]){c.strokeStyle=col;c.lineWidth=2;c.beginPath();c.arc(cx,cy,rad*s,0,7);c.stroke();c.fillStyle=col;c.font='bold 12px system-ui';c.fillText(lab+' '+rad.toFixed(1)+' m',cx+rad*s*.71+4,cy-rad*s*.71-4)}
+  c.fillStyle=css('--muted');c.font='12px system-ui';c.fillText('N',cx+4,12);c.fillText(R.toFixed(0)+' m',w-40,cy-6);
+}
+function drawSeries(r){
+  const[c,w,h]=setup($('#series'));const t0=r.pts[0].t,T=Math.max(1,r.pts[r.pts.length-1].t-t0),M=Math.max(1,r.max);
+  const X=t=>34+(t-t0)/T*(w-44),Y=d=>h-20-d/M*(h-30);
+  c.strokeStyle=css('--rule');c.fillStyle=css('--muted');c.font='11px system-ui';
+  for(const v of [0,M/2,M]){c.beginPath();c.moveTo(34,Y(v));c.lineTo(w-10,Y(v));c.stroke();c.fillText(v.toFixed(0)+'m',2,Y(v)+4)}
+  c.fillText(fmt(T),w-50,h-4);c.fillText('0:00',34,h-4);
+  c.strokeStyle=css('--navy');c.lineWidth=1.2;c.beginPath();const step=Math.max(1,Math.floor(r.pts.length/2000));
+  r.pts.forEach((p,i)=>{if(i%step&&i!==r.pts.length-1)return;i?c.lineTo(X(p.t),Y(p.d)):c.moveTo(X(p.t),Y(p.d))});c.stroke();
+}
+let map,layer;
+function drawMap(r){
+  if(!window.L) return;
+  if(!map){map=L.map('map');L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:22,maxNativeZoom:19,attribution:'© OpenStreetMap'}).addTo(map)}
+  if(layer) layer.remove(); layer=L.layerGroup().addTo(map);
+  const step=Math.max(1,Math.floor(fixes.length/2000));
+  fixes.forEach((f,i)=>{if(i%step)return;L.circleMarker([f.lat,f.lon],{radius:2,weight:0,fillOpacity:.5,fillColor:'#16395c'}).addTo(layer)});
+  L.circle([r.lat0,r.lon0],{radius:r.p50,color:'#1d7647',fill:false,weight:2}).addTo(layer);
+  L.circle([r.lat0,r.lon0],{radius:r.p95,color:'#c2321c',fill:false,weight:2}).addTo(layer);
+  map.fitBounds(L.latLng(r.lat0,r.lon0).toBounds(Math.max(10,r.p95*2.4)));
+}
+
+/* ---------- files ---------- */
+$('#csv').onclick=()=>{
+  const rows=['time_iso,unix_ms,lat,lon,reported_accuracy_m,altitude_m,altitude_accuracy_m'].concat(fixes.map(f=>[new Date(f.t).toISOString(),f.t,f.lat,f.lon,f.acc,f.alt??'',f.altAcc??''].join(',')));
+  const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([rows.join('\n')],{type:'text/csv'}));
+  a.download='gps-test-'+new Date().toISOString().slice(0,16).replace(':','')+'.csv';a.click();
+};
+$('#load').onchange=async e=>{
+  const f=e.target.files[0]; if(!f) return; const lines=(await f.text()).trim().split(/\r?\n/).slice(1);
+  fixes=lines.map(l=>{const c=l.split(',');return{t:+c[1],lat:+c[2],lon:+c[3],acc:c[4]===''?null:+c[4],alt:c[5]===''?null:+c[5],altAcc:c[6]===''?null:+c[6]}}).filter(x=>isFinite(x.lat));
+  persist(); analyze();
+};
+$('#clear').onclick=()=>{if(watch!==null)return;fixes=[];persist();analyze();$('#clear').textContent='Cleared';setTimeout(()=>$('#clear').textContent='Clear data',1500)};
+
+/* ---------- loop ---------- */
+setInterval(()=>{
+  if(watch!==null){
+    const now=Date.now(); $('#clock').textContent=fmt(now-t0);
+    $('#status').textContent=`Recording · ${fixes.length} fixes · ends at ${new Date(endAt).toLocaleTimeString([], {hour:'numeric',minute:'2-digit'})}`;
+    if(now>=endAt) stop('Finished');
+  }
+},1000);
+setInterval(()=>{if(watch!==null)analyze()},10000);
+window.addEventListener('resize',analyze);
+if(fixes.length){$('#status').textContent=`Loaded ${fixes.length} saved fixes from the last run`}
+analyze();
+})();
+</script>
+</body>
+</html>
